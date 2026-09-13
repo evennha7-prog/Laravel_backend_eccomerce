@@ -1,0 +1,59 @@
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+ehthumbs.db
+
+# Environment variables & secrets (CRITICAL)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.cert
+*.crt
+*.pfx
+/auth.json
+
+# IDE & Editor files
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+/.qoder
+.phpactor.json
+*.sublime-project
+*.sublime-workspace
+
+# Testing & Cache
+.phpunit.result.cache
+/.phpunit.cache
+
+# Dependencies & Build artifacts
+/node_modules
+/vendor
+/public/build
+/public/hot
+/public/storage
+
+# Storage keys and internal pail
+/storage/*.key
+/storage/pail
+
+# Database & CSV exports (prevent leak of credentials or personal data)
+*.sqlite
+*.sqlite3
+*.db
+*.csv
+*.sql
+*.dump
+*.bak
+
+# Homestead / Dev environments
+Homestead.json
+Homestead.yaml
