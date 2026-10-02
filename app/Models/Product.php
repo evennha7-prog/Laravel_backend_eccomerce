@@ -5,31 +5,36 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\InteractsWithMedia;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-
-class Product extends Model implements HasMedia
+class Product extends Model
 {
     use HasFactory;
-    use InteractsWithMedia;
 
     protected $fillable = [
         'category_id',
         'name',
         'description',
         'price',
+        'image',
     ];
 
-    public function registerMediaCollections(): void
-    {
-        $this->addMediaCollection('images')
-            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
-            ->singleFile();
-    }
+    protected $casts = [
+        'price' => 'decimal:2',
+    ];
 
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function cartItems(): HasMany
+    {
+        return $this->hasMany(CartItem::class);
+    }
+
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
     }
 }

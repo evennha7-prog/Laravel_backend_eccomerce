@@ -2,50 +2,40 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Product;
 use App\Models\Category;
+use App\Models\Product;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
-
-    /*
-    |--------------------------------------------------------------------------
-    | 1. Get All Categories With Products
-    |--------------------------------------------------------------------------
-    */
-    public function index()
+    /**
+     * Get all categories with their associated products.
+     */
+    public function index(): JsonResponse
     {
-        $categories = Category::with([
-            'products:id,
-            category_id,
-            name,
-            description,
-            price,
-            image'
-        ])->get();
+        $categories = Category::with(['products' => function ($query) {
+            $query->select(['id', 'category_id', 'name', 'description', 'price', 'image', 'created_at']);
+        }])->get();
 
         return response()->json([
             'success' => true,
-            'categories' => $categories
+            'categories' => $categories,
         ], 200);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | 2. Get Products By Category
-    |--------------------------------------------------------------------------
-    */
-    public function getProductByCate($id)
+    /**
+     * Get all products belonging to a specific category.
+     */
+    public function getProductByCate(int $id): JsonResponse
     {
         $category = Category::find($id);
 
-        if (!$category) {
+        if (! $category) {
             return response()->json([
                 'success' => false,
-                'message' => 'Category not found'
+                'message' => 'Category not found',
             ], 404);
         }
 
@@ -54,31 +44,26 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'category' => $category->name,
-            'products' => $products
+            'products' => $products,
         ], 200);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | 3. Search Products
-    |--------------------------------------------------------------------------
-    */
-    public function search(Request $request)
+    /**
+     * Search products by name, price range, and category.
+     */
+    public function search(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'search' => 'required|string|max:255',
-            'min_price' => 'nullable|numeric',
-            'max_price' => 'nullable|numeric',
+            'min_price' => 'nullable|numeric|min:0',
+            'max_price' => 'nullable|numeric|min:0',
             'category_id' => 'nullable|exists:categories,id',
         ]);
 
         $query = Product::query();
 
-        // Search by name
-        $query->where('name', 'like', '%' . $validated['search'] . '%');
+        $query->where('name', 'like', '%'.$validated['search'].'%');
 
-        // Filter by price
         if (isset($validated['min_price'])) {
             $query->where('price', '>=', $validated['min_price']);
         }
@@ -87,41 +72,34 @@ class ProductController extends Controller
             $query->where('price', '<=', $validated['max_price']);
         }
 
-        // Filter by category
         if (isset($validated['category_id'])) {
             $query->where('category_id', $validated['category_id']);
         }
 
-        $products = $query->get();
+        $products = $query->with('category:id,name')->get();
 
         return response()->json([
             'success' => true,
-            'products' => $products
+            'products' => $products,
         ], 200);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | 4. Store New Product
-    |--------------------------------------------------------------------------
-    */
-    public function store(Request $request)
+    /**
+     * Store a newly created product in storage.
+     */
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'image' => 'nullable|image|max:2048'
+            'price' => 'required|numeric|min:0',
+            'image' => 'nullable|image|max:2048',
         ]);
 
         $imagePath = null;
-
-        // Upload Image
         if ($request->hasFile('image')) {
-            $imagePath = Storage::disk('public')
-                ->putFile('products', $request->file('image'));
+            $imagePath = $request->file('image')->store('products', 'public');
         }
 
         $product = Product::create([
@@ -135,28 +113,24 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product created successfully',
-            'product' => $product
+            'product' => $product,
         ], 201);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | 5. Delete Product
-    |--------------------------------------------------------------------------
-    */
-    public function destroy($id)
+    /**
+     * Remove the specified product from storage.
+     */
+    public function destroy(int $id): JsonResponse
     {
         $product = Product::find($id);
 
-        if (!$product) {
+        if (! $product) {
             return response()->json([
                 'success' => false,
-                'message' => 'Product not found'
+                'message' => 'Product not found',
             ], 404);
         }
 
-        // Delete image if exists
         if ($product->image && Storage::disk('public')->exists($product->image)) {
             Storage::disk('public')->delete($product->image);
         }
@@ -165,7 +139,7 @@ class ProductController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Product deleted successfully'
+            'message' => 'Product deleted successfully',
         ], 200);
     }
 }

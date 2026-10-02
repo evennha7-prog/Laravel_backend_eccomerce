@@ -28,10 +28,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user/delete', [AuthController::class, 'deleteAccount']);
 
     Route::get('/address', [AddressController::class, 'index']);
+    Route::get('/addresses', [AddressController::class, 'index']);
     Route::post('/addresses', [AddressController::class, 'store']);
+    Route::get('/addresses/{address}', [AddressController::class, 'show']);
     Route::put('/addresses/{address}', [AddressController::class, 'update']);
     Route::delete('/addresses/{address}', [AddressController::class, 'destroy']);
 
+    Route::get('/cart', [CartController::class, 'getCarts']);
+    Route::get('/cart/view', [CartController::class, 'getCarts']);
     Route::get('/cart/veiw', [CartController::class, 'getCarts']);
     Route::post('/cart', [CartController::class, 'store']);
     Route::put('/cart/{itemId}', [CartController::class, 'update']);

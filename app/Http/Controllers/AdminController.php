@@ -65,11 +65,18 @@ class AdminController extends Controller
 
         $validated = $request->validate([
             'username' => 'sometimes|string|max:255',
-            'avatar'=>'default'
             'email' => 'sometimes|email|unique:users,email,'.$id,
             'status' => 'sometimes|in:active,inactive',
             'role' => 'sometimes|in:admin,user',
+            'avatar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
+
+        if ($request->hasFile('avatar')) {
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+            $validated['avatar'] = $request->file('avatar')->store('avatars', 'public');
+        }
 
         if ($request->filled('password')) {
             $validated['password'] = Hash::make($request->password);
@@ -88,7 +95,7 @@ class AdminController extends Controller
     {
         $user = User::findOrFail($id);
 
-        if ($user->avatar) {
+        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
             Storage::disk('public')->delete($user->avatar);
         }
 
@@ -175,7 +182,7 @@ class AdminController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            if ($product->image) {
+            if ($product->image && Storage::disk('public')->exists($product->image)) {
                 Storage::disk('public')->delete($product->image);
             }
             $validated['image'] = $request->file('image')->store('products', 'public');
@@ -194,7 +201,7 @@ class AdminController extends Controller
     {
         $product = Product::findOrFail($id);
 
-        if ($product->image) {
+        if ($product->image && Storage::disk('public')->exists($product->image)) {
             Storage::disk('public')->delete($product->image);
         }
 
@@ -291,7 +298,7 @@ class AdminController extends Controller
         $order = Order::findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|in:PENDING,PROCESSING,SHIPPED,COMPLETED,CANCELLED',
+            'status' => 'required|in:PENDING,COMPLETED,CANCELLED',
         ]);
 
         $order->status = $validated['status'];

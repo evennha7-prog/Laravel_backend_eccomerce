@@ -3,71 +3,75 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
     /**
-     * GET /api/categories
+     * Display a listing of categories.
      */
-    public function index()
+    public function index(): JsonResponse
     {
         $categories = Category::all();
 
         return response()->json([
-            'categories' => $categories
+            'success' => true,
+            'categories' => $categories,
         ], 200);
     }
 
     /**
-     * POST /api/categories
+     * Store a newly created category in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:categories,name',
+            'description' => 'nullable|string',
         ]);
 
-        $category = Category::create([
-            'name' => $request->name
-        ]);
+        $category = Category::create($validated);
 
         return response()->json([
+            'success' => true,
             'message' => 'Category created successfully',
-            'category' => $category
+            'category' => $category,
         ], 201);
     }
 
     /**
-     * PUT /api/categories/{id}
+     * Update the specified category in storage.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id): JsonResponse
     {
         $category = Category::findOrFail($id);
 
-        $request->validate([
-            'name' => 'required|string|max:255',
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255|unique:categories,name,'.$id,
+            'description' => 'nullable|string',
         ]);
 
-        $category->name = $request->name;
-        $category->save();
+        $category->update($validated);
 
         return response()->json([
+            'success' => true,
             'message' => 'Category updated successfully',
-            'category' => $category
+            'category' => $category,
         ], 200);
     }
 
     /**
-     * DELETE /api/categories/{id}
+     * Remove the specified category from storage.
      */
-    public function destroy($id)
+    public function destroy(int $id): JsonResponse
     {
         $category = Category::findOrFail($id);
         $category->delete();
 
         return response()->json([
-            'message' => 'Category deleted successfully'
+            'success' => true,
+            'message' => 'Category deleted successfully',
         ], 200);
     }
 }

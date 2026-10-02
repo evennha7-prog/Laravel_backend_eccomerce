@@ -4,18 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Cart;
 use App\Models\Product;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CartController extends Controller
 {
-    // Apply Sanctum auth
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
-    // GET /api/cart - view user's active cart
-    public function getCarts()
+    /**
+     * Get the authenticated user's active cart.
+     */
+    public function getCarts(): JsonResponse
     {
         $user = auth()->user();
 
@@ -24,62 +22,73 @@ class CartController extends Controller
             ->with('items.product')
             ->first();
 
-        if (!$cart || $cart->items->isEmpty()) {
+        if (! $cart || $cart->items->isEmpty()) {
             return response()->json([
+                'success' => true,
                 'message' => 'No Cart Found',
-                'cart' => null
+                'cart' => null,
             ], 200);
         }
 
         return response()->json([
-            'cart' => $cart
+            'success' => true,
+            'cart' => $cart,
         ], 200);
     }
 
-    // POST /api/cart - add product to cart
-    public function store(Request $request)
+    /**
+     * Add a product to the active cart.
+     */
+    public function store(Request $request): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity'   => 'required|integer|min:1',
+            'quantity' => 'required|integer|min:1',
         ]);
 
         $user = auth()->user();
-        $product = Product::findOrFail($request->product_id);
+        $product = Product::findOrFail($validated['product_id']);
 
-        $cart = Cart::firstOrCreate(
-            ['user_id' => $user->id, 'status' => 'ACTIVE'],
-            ['total' => 0]
-        );
+        $cart = DB::transaction(function () use ($user, $product, $validated) {
+            $cart = Cart::firstOrCreate(
+                ['user_id' => $user->id, 'status' => 'ACTIVE'],
+                ['total' => 0]
+            );
 
-        $item = $cart->items()->where('product_id', $product->id)->first();
+            $item = $cart->items()->where('product_id', $product->id)->first();
 
-        if ($item) {
-            $item->quantity += $request->quantity;
-            $item->price = $item->quantity * $product->price;
-            $item->save();
-        } else {
-            $cart->items()->create([
-                'product_id' => $product->id,
-                'quantity'   => $request->quantity,
-                'price'      => $request->quantity * $product->price,
-            ]);
-        }
+            if ($item) {
+                $item->quantity += $validated['quantity'];
+                $item->price = $item->quantity * $product->price;
+                $item->save();
+            } else {
+                $cart->items()->create([
+                    'product_id' => $product->id,
+                    'quantity' => $validated['quantity'],
+                    'price' => $validated['quantity'] * $product->price,
+                ]);
+            }
 
-        $cart->total = $cart->items()->sum('price');
-        $cart->save();
+            $cart->total = $cart->items()->sum('price');
+            $cart->save();
+
+            return $cart;
+        });
 
         return response()->json([
+            'success' => true,
             'message' => 'Product added to cart successfully',
-            'cart' => $cart->load('items.product')
+            'cart' => $cart->load('items.product'),
         ], 200);
     }
 
-    // PUT /api/cart/{itemId} - update item quantity
-    public function update(Request $request, $itemId)
+    /**
+     * Update the quantity of an item in the cart.
+     */
+    public function update(Request $request, int $itemId): JsonResponse
     {
-        $request->validate([
-            'quantity' => 'required|integer|min:1'
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1',
         ]);
 
         $user = auth()->user();
@@ -87,43 +96,57 @@ class CartController extends Controller
             ->where('status', 'ACTIVE')
             ->firstOrFail();
 
-        $item = $cart->items()->with('product')->where('id', $itemId)->firstOrFail();
+        $cart = DB::transaction(function () use ($cart, $itemId, $validated) {
+            $item = $cart->items()->with('product')->where('id', $itemId)->firstOrFail();
 
-        $item->quantity = $request->quantity;
-        $item->price = $item->quantity * $item->product->price;
-        $item->save();
+            $item->quantity = $validated['quantity'];
+            $item->price = $item->quantity * $item->product->price;
+            $item->save();
 
-        $cart->total = $cart->items()->sum('price');
-        $cart->save();
+            $cart->total = $cart->items()->sum('price');
+            $cart->save();
+
+            return $cart;
+        });
 
         return response()->json([
+            'success' => true,
             'message' => 'Cart item updated successfully',
-            'cart' => $cart->load('items.product')
+            'cart' => $cart->load('items.product'),
         ], 200);
     }
 
-    // DELETE /api/cart/{itemId} - remove item
-    public function destroy($itemId)
+    /**
+     * Remove an item from the cart.
+     */
+    public function destroy(int $itemId): JsonResponse
     {
         $user = auth()->user();
         $cart = Cart::where('user_id', $user->id)
             ->where('status', 'ACTIVE')
             ->firstOrFail();
 
-        $item = $cart->items()->where('id', $itemId)->firstOrFail();
-        $item->delete();
+        $cart = DB::transaction(function () use ($cart, $itemId) {
+            $item = $cart->items()->where('id', $itemId)->firstOrFail();
+            $item->delete();
 
-        $cart->total = $cart->items()->sum('price');
-        $cart->save();
+            $cart->total = $cart->items()->sum('price') ?: 0;
+            $cart->save();
+
+            return $cart;
+        });
 
         return response()->json([
+            'success' => true,
             'message' => 'Item removed from cart successfully',
-            'cart' => $cart->load('items.product')
+            'cart' => $cart->load('items.product'),
         ], 200);
     }
 
-    // DELETE /api/cart/clear - clear entire cart
-    public function clear()
+    /**
+     * Clear all items from the active cart.
+     */
+    public function clear(): JsonResponse
     {
         $user = auth()->user();
         $cart = Cart::where('user_id', $user->id)
@@ -131,14 +154,17 @@ class CartController extends Controller
             ->first();
 
         if ($cart) {
-            $cart->items()->delete();
-            $cart->total = 0;
-            $cart->save();
+            DB::transaction(function () use ($cart) {
+                $cart->items()->delete();
+                $cart->total = 0;
+                $cart->save();
+            });
         }
 
         return response()->json([
+            'success' => true,
             'message' => 'Cart cleared successfully',
-            'cart' => $cart
+            'cart' => $cart ? $cart->load('items') : null,
         ], 200);
     }
 }
